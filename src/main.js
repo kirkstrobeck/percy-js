@@ -145,6 +145,32 @@ class PercyClient {
     return this._httpPost(`${this.apiUrl}/builds/${buildId}/resources/`, data);
   }
 
+  parseMissingResourceShas(response) {
+    let resources = response.body.data &&
+      response.body.data.relationships &&
+      response.body.data.relationships['missing-resources'] &&
+      response.body.data.relationships['missing-resources'].data || [];
+    return resources.map(resource => resource.id);
+  }
+
+  uploadMissingResources(buildId, resources, missingResourceShas) {
+    if (!missingResourceShas.length) {
+      return;
+    }
+
+    let shaToResource = {};
+    resources.forEach((resource) => {
+      shaToResource[resource.sha] = resource;
+    });
+
+    let promises = missingResourceShas.map((sha) => {
+      let resource = shaToResource[sha];
+      let content = resource.localPath ? fs.readFileSync(resource.localPath) : resource.content;
+      return this.uploadResource(buildId, content)
+    })
+    return Promise.all(promises);
+  }
+
   createSnapshot(buildId, resources, options) {
     options = options || {};
     resources = resources || [];
